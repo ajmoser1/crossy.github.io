@@ -383,7 +383,7 @@
             }
 
             updateCamera() {
-                // Smoothly interpolate camera to target (ease-out style: fast start, gentle settle)
+                // Smoothly interpolate camera to target (ease-out: smoother when changing lanes)
                 const diff = this.targetCameraOffset - this.cameraOffset;
                 const lerpSpeed = 0.08; // Slower = smoother follow when changing lanes
                 this.cameraOffset += diff * lerpSpeed;
