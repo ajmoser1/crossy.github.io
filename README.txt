@@ -26,5 +26,5 @@ The change you just made created a huge bug. Now, when a new lane is supposed to
 
 It still doesnt work, and now the player appears to move up to two lanes at a time but is killed by something not in his lane. Take a deep look at the code and find the bugs with the camera movement/lane generation/player position.
 
-(After this prompt, the bug still wasn't fixed and I ran out of free messages. I downloaded the last working version of the file and opened it in cursor. Following are the cursor prompts.)
+(After this prompt, the bug still wasn't fixed and I ran out of free messages. I downloaded the last working version of the file and uploaded to github and made a github page for it.)
 
