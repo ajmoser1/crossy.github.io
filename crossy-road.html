@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crossy Road Clone</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+        }
+
+        #gameContainer {
+            position: relative;
+            background: #2d3748;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            display: block;
+            background: #1a202c;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            z-index: 20;
+        }
+
+        #gameOver h2 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #f56565;
+        }
+
+        #gameOver button {
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 20px;
+            background: #48bb78;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #gameOver button:hover {
+            background: #38a169;
+            transform: scale(1.05);
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 16px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="600" height="800"></canvas>
+        <div id="ui">
+            <div>Score: <span id="score">0</span></div>
+            <div>Best: <span id="highScore">0</span></div>
+        </div>
+        <div id="gameOver">
+            <h2>Game Over!</h2>
+            <p style="font-size: 24px;">Score: <span id="finalScore">0</span></p>
+            <button onclick="game.restart()">Play Again</button>
+        </div>
+        <div id="instructions">
+            Use Arrow Keys to Move
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const TILE_SIZE = 50;
+        const LANES = 16;
+        const PLAYER_START_ROW = 14;
+
+        class Game {
+            constructor() {
+                this.player = {
+                    x: 5,
+                    y: PLAYER_START_ROW,
+                    color: '#fbbf24'
+                };
+                this.score = 0;
+                this.highScore = localStorage.getItem('highScore') || 0;
+                this.gameRunning = true;
+                this.maxProgress = PLAYER_START_ROW;
+                
+                this.lanes = this.generateLanes();
+                this.setupControls();
+                this.gameLoop();
+            }
+
+            generateLanes() {
+                const lanes = [];
+                const laneTypes = ['grass', 'road', 'water', 'grass', 'road'];
+                
+                for (let i = 0; i < LANES; i++) {
+                    const type = laneTypes[Math.floor(Math.random() * laneTypes.length)];
+                    lanes.push({
+                        type: type,
+                        color: this.getLaneColor(type),
+                        obstacles: []
+                    });
+                }
+                
+                // Safe starting area
+                lanes[PLAYER_START_ROW].type = 'grass';
+                lanes[PLAYER_START_ROW].color = this.getLaneColor('grass');
+                lanes[PLAYER_START_ROW - 1].type = 'grass';
+                lanes[PLAYER_START_ROW - 1].color = this.getLaneColor('grass');
+                
+                return lanes;
+            }
+
+            getLaneColor(type) {
+                const colors = {
+                    'grass': '#48bb78',
+                    'road': '#4a5568',
+                    'water': '#4299e1'
+                };
+                return colors[type] || '#2d3748';
+            }
+
+            setupControls() {
+                document.addEventListener('keydown', (e) => {
+                    if (!this.gameRunning) return;
+                    
+                    const oldY = this.player.y;
+                    
+                    switch(e.key) {
+                        case 'ArrowUp':
+                            if (this.player.y > 0) this.player.y--;
+                            break;
+                        case 'ArrowDown':
+                            if (this.player.y < LANES - 1) this.player.y++;
+                            break;
+                        case 'ArrowLeft':
+                            if (this.player.x > 0) this.player.x--;
+                            break;
+                        case 'ArrowRight':
+                            if (this.player.x < 11) this.player.x++;
+                            break;
+                        default:
+                            return;
+                    }
+                    
+                    e.preventDefault();
+                    
+                    // Score points for moving forward
+                    if (this.player.y < this.maxProgress) {
+                        const pointsGained = this.maxProgress - this.player.y;
+                        this.score += pointsGained * 10;
+                        this.maxProgress = this.player.y;
+                        this.updateScore();
+                        
+                        // Generate new lanes as player progresses
+                        if (this.player.y < 3) {
+                            this.shiftLanesDown();
+                        }
+                    }
+                });
+            }
+
+            shiftLanesDown() {
+                // Remove bottom lane
+                this.lanes.pop();
+                
+                // Add new lane at top
+                const laneTypes = ['grass', 'road', 'water'];
+                const type = laneTypes[Math.floor(Math.random() * laneTypes.length)];
+                this.lanes.unshift({
+                    type: type,
+                    color: this.getLaneColor(type),
+                    obstacles: []
+                });
+                
+                this.player.y++;
+                this.maxProgress++;
+            }
+
+            updateScore() {
+                document.getElementById('score').textContent = this.score;
+                
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('highScore', this.highScore);
+                    document.getElementById('highScore').textContent = this.highScore;
+                }
+            }
+
+            gameLoop() {
+                if (!this.gameRunning) return;
+                
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+
+            draw() {
+                // Clear canvas
+                ctx.fillStyle = '#1a202c';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw lanes
+                for (let i = 0; i < LANES; i++) {
+                    const lane = this.lanes[i];
+                    ctx.fillStyle = lane.color;
+                    ctx.fillRect(0, i * TILE_SIZE, canvas.width, TILE_SIZE);
+                    
+                    // Draw lane borders
+                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(0, i * TILE_SIZE);
+                    ctx.lineTo(canvas.width, i * TILE_SIZE);
+                    ctx.stroke();
+                }
+                
+                // Draw player
+                this.drawPlayer();
+            }
+
+            drawPlayer() {
+                const x = this.player.x * TILE_SIZE + TILE_SIZE / 2;
+                const y = this.player.y * TILE_SIZE + TILE_SIZE / 2;
+                
+                // Draw chicken-like character
+                ctx.save();
+                
+                // Body
+                ctx.fillStyle = this.player.color;
+                ctx.beginPath();
+                ctx.arc(x, y, 18, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Eyes
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(x - 6, y - 5, 4, 0, Math.PI * 2);
+                ctx.arc(x + 6, y - 5, 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = 'black';
+                ctx.beginPath();
+                ctx.arc(x - 6, y - 5, 2, 0, Math.PI * 2);
+                ctx.arc(x + 6, y - 5, 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Beak
+                ctx.fillStyle = '#f97316';
+                ctx.beginPath();
+                ctx.moveTo(x, y + 2);
+                ctx.lineTo(x - 4, y + 8);
+                ctx.lineTo(x + 4, y + 8);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Crest
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(x - 4, y - 12, 4, 0, Math.PI * 2);
+                ctx.arc(x, y - 15, 5, 0, Math.PI * 2);
+                ctx.arc(x + 4, y - 12, 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+
+            endGame() {
+                this.gameRunning = false;
+                document.getElementById('finalScore').textContent = this.score;
+                document.getElementById('gameOver').style.display = 'block';
+            }
+
+            restart() {
+                document.getElementById('gameOver').style.display = 'none';
+                this.player.x = 5;
+                this.player.y = PLAYER_START_ROW;
+                this.score = 0;
+                this.maxProgress = PLAYER_START_ROW;
+                this.lanes = this.generateLanes();
+                this.gameRunning = true;
+                this.updateScore();
+                document.getElementById('highScore').textContent = this.highScore;
+                this.gameLoop();
+            }
+        }
+
+        // Start the game
+        const game = new Game();
+    </script>
+</body>
+</html>
