@@ -282,11 +282,11 @@
                             this.updateScore();
                         }
                         
-                        // Keep player centered - shift lanes when player moves up past middle (only once per keypress)
+                        // Keep player centered - shift lanes when player moves up past middle (only once per keypress).
+                        // Do NOT scroll the camera: the view stays fixed, new lane appears at top, player stays at row 8.
                         const middleLane = 8;
                         if (this.player.y < middleLane) {
                             this.shiftLanesDown();
-                            this.targetCameraOffset += TILE_SIZE;
                             this.player.y = middleLane; // Keep player at center row so one move = one shift
                         }
                     }
