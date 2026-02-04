@@ -233,6 +233,21 @@
                     let newX = oldX;
                     let newY = oldY;
                     
+                    // Check if player is on a log (for proper side-to-side movement)
+                    const currentLane = this.lanes[Math.floor(oldY)];
+                    let onLog = false;
+                    if (currentLane && currentLane.type === 'water' && !currentLane.hasBridge) {
+                        for (let log of currentLane.obstacles) {
+                            const logLeft = log.x;
+                            const logRight = log.x + log.width;
+                            const playerCenter = oldX + 0.5;
+                            if (playerCenter > logLeft && playerCenter < logRight) {
+                                onLog = true;
+                                break;
+                            }
+                        }
+                    }
+                    
                     switch(e.key) {
                         case 'ArrowUp':
                             if (this.player.y > 0) newY = Math.floor(oldY) - 1;
@@ -241,10 +256,24 @@
                             if (this.player.y < LANES - 1) newY = Math.floor(oldY) + 1;
                             break;
                         case 'ArrowLeft':
-                            if (this.player.x > 0) newX = Math.floor(oldX) - 1;
+                            if (this.player.x > 0) {
+                                if (onLog) {
+                                    // When on a log, move relative to current position to preserve log movement
+                                    newX = oldX - 1;
+                                } else {
+                                    newX = Math.floor(oldX) - 1;
+                                }
+                            }
                             break;
                         case 'ArrowRight':
-                            if (this.player.x < 11) newX = Math.floor(oldX) + 1;
+                            if (this.player.x < 11) {
+                                if (onLog) {
+                                    // When on a log, move relative to current position to preserve log movement
+                                    newX = oldX + 1;
+                                } else {
+                                    newX = Math.floor(oldX) + 1;
+                                }
+                            }
                             break;
                         default:
                             return;
@@ -271,6 +300,11 @@
                     
                     // Only move if not blocked by rock
                     if (!blockedByRock) {
+                        // Ensure bounds when moving on log (fractional positions)
+                        if (onLog) {
+                            if (newX < 0) newX = 0;
+                            if (newX > 11) newX = 11;
+                        }
                         this.player.x = newX;
                         this.player.y = newY;
                         
@@ -288,6 +322,9 @@
                         if (this.player.y < middleLane) {
                             this.shiftLanesDown();
                             this.player.y = middleLane; // Keep player at center row so one move = one shift
+                            // Reset maxProgress to middleLane so future forward progress can be tracked
+                            // This ensures scoring continues after lane shifts
+                            this.maxProgress = middleLane;
                         }
                     }
                 });
